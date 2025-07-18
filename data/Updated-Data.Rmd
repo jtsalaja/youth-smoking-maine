@@ -1,0 +1,119 @@
+---
+title: "Project Data Work"
+author: "Jelizaveta Tsalaja"
+output: github_document
+---
+
+Load Libraries
+
+```{r upload-libraries}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+```
+
+
+For reusabilty purposes I have written a function to transfrom the data from csv files.
+
+
+```{r data-work-func}
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(readr)
+
+clean_survey_data_simple <- function(file_path, year) {
+  df <- read.csv(file_path, stringsAsFactors = FALSE)
+
+  # Rename columns
+  colnames(df) <- c(
+    "category", "total_percent", "total_ci", "total_number",
+    "female_percent", "female_ci", "female_number",
+    "male_percent", "male_ci", "male_number"
+  )
+
+  # Add group_type
+  df_clean <- df %>%
+    mutate(group_type = case_when(
+      str_detect(category, "----Age----") ~ "Age",
+      str_detect(category, "----Grade----") ~ "Grade",
+      str_detect(category, "----Race/Ethnicity----") ~ "Race/Ethnicity",
+      TRUE ~ NA_character_
+    )) %>%
+    fill(group_type, .direction = "down") %>%
+    filter(!str_detect(category, "----"))
+
+  # Build long format using mutate + select
+  total_df <- df_clean %>%
+    mutate(
+      gender = "total",
+      percent = as.numeric(str_remove(total_percent, "%")),
+      ci = ifelse(total_ci %in% c("^", "*"), NA, total_ci),
+      number = as.numeric(total_number)
+    ) %>%
+    select(subgroup = category, group_type, gender, percent, ci, number)
+
+  female_df <- df_clean %>%
+    mutate(
+      gender = "female",
+      percent = as.numeric(str_remove(female_percent, "%")),
+      ci = ifelse(female_ci %in% c("^", "*"), NA, female_ci),
+      number = as.numeric(female_number)
+    ) %>%
+    select(subgroup = category, group_type, gender, percent, ci, number)
+
+  male_df <- df_clean %>%
+    mutate(
+      gender = "male",
+      percent = as.numeric(str_remove(male_percent, "%")),
+      ci = ifelse(male_ci %in% c("^", "*"), NA, male_ci),
+      number = as.numeric(male_number)
+    ) %>%
+    select(subgroup = category, group_type, gender, percent, ci, number)
+
+  # Combine and add year
+  df_long <- bind_rows(total_df, female_df, male_df) %>%
+    mutate(year = year)
+
+  return(df_long)
+}
+
+
+df_2009 <- clean_survey_data_simple("/cloud/project/data/smoke2009.csv", 2009)
+df_2013 <- clean_survey_data_simple("/cloud/project/data/smoke2013.csv", 2013)
+df_2015 <- clean_survey_data_simple("/cloud/project/data/smoke2015.csv", 2015)
+df_2017 <- clean_survey_data_simple("/cloud/project/data/smoke2017.csv", 2017)
+df_2019 <- clean_survey_data_simple("/cloud/project/data/smoke2019.csv", 2019)
+df_2021 <- clean_survey_data_simple("/cloud/project/data/smoke2021.csv", 2021)
+```
+
+
+```{r}
+# Combine all dataframes together
+
+smoke_data <- bind_rows(df_2009, df_2013, df_2015, df_2017, df_2019, df_2021)
+
+#smoke_data <- smoke_data$group_type |>
+#  replace_na("Group Total")
+
+#Filter for whatever data we need 
+
+#Here are some of the examples
+total_age_df <- smoke_data |>
+  filter(group_type == "Age", gender == "total")
+
+female_age_df <- smoke_data |>
+  filter(group_type == "Age", gender == "female")
+
+male_age_df <- smoke_data |>
+  filter(group_type == "Age", gender == "male")
+```
+
+
+Preview Smoke Data
+
+```{r smoke-data-preview}
+smoke_data
+```

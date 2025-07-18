@@ -1,0 +1,170 @@
+---
+title: "Project proposal"
+author: "Charlie-Liz-Noku"
+output: html_document
+---
+
+```{r load-packages, message = FALSE}
+library(tidyverse)
+library(broom)
+```
+
+## 1. Introduction
+
+The Healthy Androscoggin project analyzes the Maine Integrated Youth Survey (MIYHS) data from 2009 in order to identify trends of activity,  nutrition substance/drug use, and overall environmental health. The goal is find areas of necessary intervention and promote policy  change to build healtheir communities in the Androscoggin Commnunity.
+
+Data was collected through a number of surveys offered in all grades/ages of High-School across several years. The survey asked a vast number of questions ranging all the way from, "Do you smoke?" to "What is the primary language spoken at home?". Our dataset deals with 10 years of data, we are choosing to focus predominantly on the results from smoking related questions in order to prove whether intervention is necessary at an educational level. 
+
+If we focus mainly on younger aged kids for our surveys, will the level of tobacco awareness be consistently lower?
+
+By the end of this study can we infer that level of education has a direct correlation to drug knowledge/use in kids/teens? Similarly does the school curriculum, region, or funding strongly impact whether their students use drugs?
+
+
+What change would be most effective in increaseing the amount of drugs (lbs) disposed of at the Drug Take-Back days?
+(Does a decrease in drugs given back mean there are less drugs on the streets?)
+
+
+## 2. Data
+
+
+Text goes here
+=======
+=======
+
+```{r read-in-file}
+smoked_data <- read.csv("/cloud/project/data/2009-2021_smoked_formatted.csv")
+drug_data <- read.csv("/cloud/project/data/Total_drug_weight.csv")
+```
+
+```{r rename-col-drug-data}
+drug_data <- drug_data[-1,]
+colnames(drug_data) <- c("Year","April","October","Total")
+```
+
+
+The dimension of collected data is as follows: dataset `smoked_data` has `r nrow(smoked_data)` rows (observations) and `r ncol(smoked_data)` columns (variables). The dataset `drug_data` has `r nrow(drug_data)` observations and `r ncol(drug_data)` variables.
+
+```{r dim-and-glimpse-dataframe}
+dim(smoked_data)
+glimpse(smoked_data)
+
+dim(drug_data)
+glimpse(drug_data)
+```
+
+```{r}
+smoked_data <- smoked_data |>
+  mutate(Percentage = as.numeric(str_extract(`X.`, pattern = "\\d+.\\d+")),
+         Lower_CI = as.numeric(str_extract(`Confidence.Interval`, pattern = "\\d+.\\d+")),
+         Upper_CI = as.numeric(str_extract(str_extract(`Confidence.Interval`, pattern = "-\\s*(\\d+\\.\\d+)"), pattern = "\\d+\\.\\d+")))
+```
+
+
+## 3. Data analysis plan
+
+Patterns and Relationships to explore:
+
+Smoking Behavior vs. Age:
+We will analyze how smoking behavior varies across different age groups (e.g, adolescents vs. teenagers). The hypothesis is that younger age groups may have different smoking rates and tobacco awareness compared to older groups.
+
+Smoking Behavior vs. Gender:
+We will explore the relationship between gender and smoking behavior. We will analyze whether males and females exhibit different smoking rates over time.
+
+Trends in Smoking Over Time:
+By analyzing the data across the years, we will explore how smoking rates have changed over time. This will help identify if factors like policy change and drug awareness have had an impact on smoking behavior.
+
+We will use the following types of visualizations to explore these relationships and patterns:
+
+Line Graphs / Area Charts:
+To visualize the trend of smoking behavior over time. This will help us identify patterns and assess if smoking rates have increased or decreased in recent years.
+
+Bar Charts:
+To compare smoking rates across different age groups and genders. This will allow for easy visualization of which groups have higher smoking rates.
+
+Box Plots:
+To display the distribution of smoking rates within each age group and gender, showing the range and variability of smoking behavior.
+
+Scatter Plots:
+To visualize the relationship between the amount of drugs disposed of during drug take-back days and smoking rates. This will help assess any correlation between the two behaviors.
+
+```{r}
+ggplot(data = smoked_data, aes(x = Category, y = Percentage)) +
+  geom_point() +
+  facet_wrap(~Gender)
+  labs( title = "Smoking trends in teens", 
+        x = "Age",
+        y = "Percentage") 
+  
+```
+
+
+#### Visualisation number 1
+
+```{r visulasitaion-try, message=FALSE, warning=FALSE}
+smoked_data_fixed <- smoked_data |> 
+  filter(Category == "Age") |> 
+  filter(Gender %in% c("Female","Male")) |>
+  mutate(
+    Percent_Numeric = as.numeric(gsub("%", "", X.)),  #used to be chronically, had to look up online ow to convert to numeric
+    Percent_Bin = case_when(
+      Percent_Numeric <= 10  ~ "0-10%",
+      Percent_Numeric <= 20  ~ "11-20%",
+      Percent_Numeric <= 30  ~ "21-30%",
+      Percent_Numeric <= 40  ~ "31-40%",
+      Percent_Numeric >  40  ~ "41-50%"
+    )
+  )
+
+ggplot(data = smoked_data_fixed, aes(x = Subcategory, y = Percent_Numeric, fill = Gender)) +
+  geom_col(position = "dodge") +
+  labs(title = "Percentage of Teens Who Smoked at Least One Day \nin the Past 30 Days (Across 2009-2021 surveys)", 
+       subtitle = "Based on self-reported responses to the question:\nDuring the past 30 days, on how many days did you smoke cigarettes?",
+       x = "Age Group",
+       y = "Percent") +
+  theme_minimal() 
+```
+```{r Visualization_1_Charlie}
+smoking_heatmap <- smoked_data |> 
+  filter(Category == "Age", !is.na(Percentage)) |> 
+  mutate(Year = as.factor(Year))
+
+
+ggplot(smoking_heatmap, aes(x = Year, y = Subcategory, fill = Percentage)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "yellow", high = "red", na.value = "grey") +
+  labs(
+    title = "Heatmap of Smoking Percentage by Age Group and Year",
+    x = "Survey Year",
+    y = "Age Group",
+    fill = "Smoking %"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+```{r Visualization_2_Charlie}
+
+smoking_trend <- smoked_data |>
+  filter(Category == "Total", Gender %in% c("Female", "Male")) |>
+  mutate(Percentage = as.numeric(str_extract(X., "\\d+\\.\\d+")))
+
+
+ggplot(smoking_trend, aes(x = Year, y = Percentage, color = Gender)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  labs(title = "Smoking Rates Over Time by Gender",
+       x = "Year",
+       y = "Percentage of Students Who Smoked") +
+  scale_color_manual(values = c("Female" = "pink", "Male" = "blue")) +
+  theme_minimal()
+
+```
+
+## 4. Data Ethics Review
+
+Our project examines smoking behaviors among teenagers, but several data ethical considerations must be considered One key limitation is potential bias in responses, as teenagers may underreport or misrepresent their smoking habits. Additionally, the location of data collection influences results, as different areas have social norms and experiences, it is important to acknowledge that our data represents Maine only. Moreover, our data is not divided by school or district, and thus, data is a summary. 
+
+Despite these challenges, the data can provide valuable insights by identifying trends and common factors among those who smoke and those who do not. This information could inform public health initiatives while maintaining participant anonymity.
+
+However, there is a risk of reinforcing stereotypes or overgeneralizing certain demographics. To minimize this, we aim to be transparent about our data’s limitations and ensure careful interpretation of results. By clearly defining what our findings do and do not imply, and avoiding broad generalization we hope to contribute to a more responsible and ethical analysis of smoking behaviors.
